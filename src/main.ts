@@ -1,12 +1,12 @@
-import cytoscape from "cytoscape"
-import {User, Edge } from "model"
-import euler from "cytoscape-euler";
-import World from "./world";
-import {pad, debounce} from "./helpers";
+import cytoscape from 'cytoscape';
+import {User, Ping } from './models';
+import euler from 'cytoscape-euler';
+import World from './world';
+import {pad, debounce} from './helpers';
 
-import {enableRipple} from "@syncfusion/ej2-base";
+import {enableRipple} from '@syncfusion/ej2-base';
 enableRipple(true);
-import {Slider} from "@syncfusion/ej2-inputs";
+import {Slider} from '@syncfusion/ej2-inputs';
 
 cytoscape.use(euler);
 
@@ -15,21 +15,19 @@ const DEFAULT_RATINGS_PER_USER = 4;
 const DEFAULT_TRUST_DEPTH = 3;
 
 let totalUsers = DEFAULT_TOTAL_USERS;
-let ratingsPerUser = DEFAULT_RATINGS_PER_USER
+let ratingsPerUser = DEFAULT_RATINGS_PER_USER;
 let totalRatings = ratingsPerUser * totalUsers;
 let trustDepth = DEFAULT_TRUST_DEPTH;
 
-var globalUsers : Map<number, User> = new Map<number, User>();
-var globalEdges : Map<number, Edge> = new Map<number, Edge>();
 let usersMap = null;
 let selectedUser = null;
 let cy = null;
 let removedEdges = null;
 
-const world = new World();
-const canvas = document.getElementById("trust-demo");
+const world: World = new World();
+const canvas = document.getElementById('trust-demo');
 
-function createUsersHashMap(users) {
+function createUsersHashMap(users: User[]) {
   const usersMap = {};
   users.forEach((user) => {
     usersMap[user.id] = user;
@@ -37,37 +35,29 @@ function createUsersHashMap(users) {
   return usersMap;
 }
 
-function convertUsersToGraphElements(users) {
+function getGraphElements(world: World) {
   const graphElements = {
     nodes: [],
     edges: []
   };
-  users.forEach((user) => {
+  world.users.forEach(user => {
     graphElements.nodes.push({
-      data: { 
+      data: {
+        name: user.name,
         id: user.id,
         trustDegree: Math.floor(Math.random() * 4)
       }
     });
-    // Object.keys(user.trustedUsers).forEach((userId) => {
-    //   graphElements.edges.push({
-    //     data: { 
-    //       id: user.id + userId, 
-    //       source: user.id, 
-    //       target: userId 
-    //     }
-    //   });
-    // });
-    Object.keys(user.debtsOwing).forEach((userId) => {
+    world.pings.forEach( ping => {
       graphElements.edges.push({
-        data: { 
-          id: user.id + userId, 
-          source: user.id, 
-          target: userId 
+        data: {
+          id: ping.from.id + ping.to.id,
+          source: ping.from.id,
+          target: ping.to.id
         }
       });
     });
-  })
+  });
   return graphElements;
 }
 
@@ -80,7 +70,7 @@ function convertUsersToGraphElements(users) {
  * 100 = Dark Green
  */
 function getHexColorForTrustLevel(trustLevel) {
-  let hexColorString = "#";
+  let hexColorString = '#';
   if (trustLevel < 0) {
     hexColorString += (255).toString(16);
     hexColorString += pad(Math.floor(255 - Math.abs(trustLevel) / 100 * 255).toString(16), 2); // G
@@ -94,15 +84,15 @@ function getHexColorForTrustLevel(trustLevel) {
   return hexColorString;
 }
 
-function createGraph(users) {
-  usersMap = createUsersHashMap(users);
-  const graphElements = convertUsersToGraphElements(users);
+function createGraph(world) {
+  usersMap = createUsersHashMap(world.users);
+  const graphElements = getGraphElements(world);
   const graphStyle = [
     {
       selector: 'node',
       style: {
         'background-color': '#666',
-        'label': 'data(id)',
+        'label': 'data(name)',
         'font-size': '16px',
         'color': '#fff',
       }
@@ -129,40 +119,37 @@ function createGraph(users) {
     layout: graphLayout
   });
 
-  cy.on('tap', 'node', function(evt){
+  cy.on('tap', 'node', function(evt) {
     var node = evt.target;
     const userId = node.id();
     const user = usersMap[userId];
     selectedUser = user;
-    renderGraph(user);
+    renderGraph();
   });
 
-  cy.on('tap', function(evt){
-    doNextStep(evt);
+  cy.on('tap', function(evt) {
+    doNextStep();
   });
 }
 
 
-const steps = [{fn: owe, params: [0,1,10]},
-                {fn: owe, params: [1,2,10]},
-                {fn: owe, params: [2,0,10]},
-                {fn: owe, params: [0,1,10]},
-                {fn: owe, params: [1,2,10]},
-                {fn: owe, params: [2,0,10]}]
+const steps = [ {fn: owe, params: ['Curly', 'Moe', 10]},
+                {fn: owe, params: ['Moe', 'Larry', 10]},
+                {fn: owe, params: ['Larry', 'Curly', 10]},
+                {fn: owe, params: ['Curly', 'Moe', 10]},
+                {fn: owe, params: ['Moe', 'Larry', 10]},
+                {fn: owe, params: ['Larry', 'Curly', 10]}];
 let nextStep = 0;
 let done = false;
 
-function doNextStep(evt) {
+function doNextStep() {
     if (!done) {
-        steps[nextStep].fn.apply(this,steps[nextStep].params);
+        steps[nextStep].fn.apply(this, steps[nextStep].params);
         nextStep++;
-        const fromIdx = steps[nextStep].params[1];
-        renderGraph(globalUsers[fromIdx])
+        renderGraph();
     }
-    done = nextStep>=steps.length;
+    done = nextStep >= steps.length;
 }
-
-
 
 function resetGraph() {
   Object.keys(usersMap).forEach((userId) => {
@@ -177,67 +164,66 @@ function resetGraph() {
 }
 
 
-/** 
+/**
  * This makes all the relevant debt arrows visible
  */
-function renderDebtsOwing(user, depth) {
-  const debts = user.getDebts();
-  Object.entries(debts).forEach(([friendId, debtAmt]) => {
-    if (cy.getElementById(friendId).data('trustDegree') < depth) {
-      cy.getElementById(friendId).data('trustDegree', depth);
-    }
-    
-    const edgeId = user.id + friendId;
-    const color = getHexColorForTrustLevel(debtAmt);
-    cy.getElementById(edgeId).style({
-      visibility: 'visible',
-      lineColor: color,
-      targetArrowColor: color,
+function renderDebtsOwing() {
+  world.pings.forEach((ping: Ping, id: number) => {
+    cy.add({
+      group: 'edges',
+      data: {
+        id: id,
+        source: ping.from.id,
+        target: ping.to.id
+      }
     });
-  
-
-    if (depth <= 1) return; // We've gone as deep as we need to go, so return
-
-    const friend = usersMap[friendId];
-    renderDebtsOwing(friend, depth-1);
   });
 }
 
+    // if (cy.getElementById(friendId).data('trustDegree') < depth) {
+    //   cy.getElementById(friendId).data('trustDegree', depth);
+    // }
+    // const edgeId = user.id + friendId;
+    // const color = getHexColorForTrustLevel(debtAmt);
+    // cy.getElementById(edgeId).style({
+    //   visibility: 'visible',
+    //   lineColor: color,
+    //   targetArrowColor: color,
+    // });
 
 
-// Collect all edges that are still hidden (because they aren't relevant to 
+
+// Collect all edges that are still hidden (because they aren't relevant to
 // the graph for the selected user) and remove them from the graph so they aren't
 // used for positional calculations
 function removeHiddenEdges() {
-  removedEdges = cy.edges(':hidden').remove()
+  removedEdges = cy.edges(':hidden').remove();
 }
 
 
 /**
  * Core graph rendering function. Resets it to defaults, then colors and changes
- * the graph layout for the selected user. 
- * 
- * @param {User} user 
+ * the graph layout for the selected user.
+ *
+ * @param {User} user
  */
-function renderGraph(user) {
-  const userId = user.id;
-  //user.calculateTrust(trustDepth);
+function renderGraph() {
 
   resetGraph();
 
-  // Set main user to center, TRUST_DEPTH + 1 because the outer layer is reserved for unknown strangers
-  cy.getElementById(userId)
-    .data('trustDegree', trustDepth + 1)
-    .style('background-color', '#4444ff');
+  // // Set main user to center, TRUST_DEPTH + 1 because the outer layer is reserved for unknown strangers
+  // cy.getElementById(userId)
+  //   .data('trustDegree', trustDepth + 1)
+  //   .style('background-color', '#4444ff');
 
-  renderDebtsOwing(user, trustDepth);
+  renderDebtsOwing();
 
   // Set colors based on debt owing (green == more debt) its fine
-  const debts = user.getDebts();
-  Object.entries(debts).forEach(([userId, debtAmt]) => {
-    const backgroundColor = getHexColorForTrustLevel(debtAmt);
-    cy.getElementById(userId).style('background-color', backgroundColor)
-  });
+  // const debts = user.getDebts();
+  // Object.entries(debts).forEach(([userId, debtAmt]) => {
+  //   const backgroundColor = getHexColorForTrustLevel(debtAmt);
+  //   cy.getElementById(userId).style('background-color', backgroundColor);
+  // });
 
   removeHiddenEdges();
 
@@ -258,28 +244,15 @@ function renderGraph(user) {
   layout.run();
 }
 
-function owe(from, to, amt) {
-  const fromUser = globalUsers[from];
-  const toUser = globalUsers[to];
-  new Debt(user, amt);
-  fromUser.oweUser(toUser, amt);
-  cy.add({
-    group: "edges",
-    data: { 
-      //id: fromUser.id + toUser.id, 
-      source: fromUser.id, 
-      target: toUser.id 
-    }
-  });
+function owe(from: string, to: string, amt: number) {
+  world.addPing(from, to, amt);
 }
 
-async function createWorld(totalUsers, totalRatings) {
-  globalUsers = await world.stooges();
-  globalEdges = await world.emptyEdges();
-  createGraph(globalUsers);
+async function createWorld() {
+  createGraph(world);
 
-  
-  //iterator.start();
+
+  // iterator.start();
 
   // owe.call(this,1,2,10);
   // owe.call(this,2,0,10);
@@ -289,5 +262,5 @@ async function createWorld(totalUsers, totalRatings) {
 
 }
 
-createWorld(totalUsers, totalRatings);
+createWorld();
 const updateWorld = debounce(createWorld, 250);

@@ -3,6 +3,7 @@
     "outDir": "./dist/",
     "sourceMap": true,
     "noImplicitAny": false,
+    "strictNullChecks": false,
     "module": "commonjs",
     "target": "es2019",
     "declaration": true,

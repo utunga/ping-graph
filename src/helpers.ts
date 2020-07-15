@@ -1,5 +1,5 @@
 
-function pad(num, size){ return ('000000000' + num).substr(-size); }
+function pad(num: string, size: number){ return ('000000000' + num).substr(-size); }
 
 function debounce(callback, time) {
   let interval;
