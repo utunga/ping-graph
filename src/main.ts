@@ -133,12 +133,9 @@ function createGraph(world) {
 }
 
 
-const steps = [ {fn: owe, params: ['Curly', 'Moe', 10]},
-                {fn: owe, params: ['Moe', 'Larry', 10]},
-                {fn: owe, params: ['Larry', 'Curly', 10]},
-                {fn: owe, params: ['Curly', 'Moe', 10]},
-                {fn: owe, params: ['Moe', 'Larry', 10]},
-                {fn: owe, params: ['Larry', 'Curly', 10]}];
+const steps = [ {fn: owe, params: ['Nico', 'Miles', 200]},
+                {fn: owe, params: ['Anna', 'Nico', 2000]},
+                {fn: owe, params: ['Miles', 'Anna', 500]}];
 let nextStep = 0;
 let done = false;
 
@@ -146,7 +143,7 @@ function doNextStep() {
     if (!done) {
         steps[nextStep].fn.apply(this, steps[nextStep].params);
         nextStep++;
-        renderGraph();
+        // renderGraph();
     }
     done = nextStep >= steps.length;
 }
@@ -168,6 +165,7 @@ function resetGraph() {
  * This makes all the relevant debt arrows visible
  */
 function renderDebtsOwing() {
+  console.log(world.pings);
   world.pings.forEach((ping: Ping, id: number) => {
     cy.add({
       group: 'edges',
@@ -225,7 +223,7 @@ function renderGraph() {
   //   cy.getElementById(userId).style('background-color', backgroundColor);
   // });
 
-  removeHiddenEdges();
+  // removeHiddenEdges();
 
   const layout = cy.elements().layout({
     name: 'euler',
@@ -245,21 +243,19 @@ function renderGraph() {
 }
 
 function owe(from: string, to: string, amt: number) {
-  world.addPing(from, to, amt);
+  var ping = world.addPing(from, to, amt);
+  cy.add({
+    group: 'edges',
+    data: {
+      id: ping.id,
+      source: ping.from.id,
+      target: ping.to.id
+    }
+  })
 }
 
 async function createWorld() {
   createGraph(world);
-
-
-  // iterator.start();
-
-  // owe.call(this,1,2,10);
-  // owe.call(this,2,0,10);
-  // owe.call(this,0,1,10);
-  // owe.call(this,1,2,10);
-  // owe.call(this,2,0,10);
-
 }
 
 createWorld();

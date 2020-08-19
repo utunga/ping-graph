@@ -14,6 +14,7 @@ class World {
     const toUser = this.userByName(to)!;
     const ping = new Ping(fromUser, toUser, amt);
     this.pings.push(ping);
+    return ping;
   }
 
   userByName(name: string): User | undefined {
@@ -26,9 +27,9 @@ class World {
 
   stooges() {
     return [
-      new User('Curly'),
-      new User('Moe'),
-      new User('Larry')
+      new User('Miles'),
+      new User('Nico'),
+      new User('Anna')
     ];
   }
 

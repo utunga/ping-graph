@@ -4,7 +4,10 @@ function generateRandomString(length) {
 }
 
 class Ping {
-  constructor(public from: User, public to: User, public amt: number) {}
+  id: string;
+  constructor(public from: User, public to: User, public amt: number) {
+    this.id = generateRandomString(4);
+  }
 }
 
 class User {
